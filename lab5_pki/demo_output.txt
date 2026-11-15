@@ -1,0 +1,93 @@
+========== 1. Initialise the CA ==========
+[*] Creating directory structure in /tmp/demo/pki/ca
+[*] Generating the CA root private key (RSA 4096 bits)
+[*] Creating the self-signed CA certificate (valid 3650 days)
+[OK] CA initialised
+subject=C = MD, ST = Chisinau, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = FAF-242 Root CA
+issuer=C = MD, ST = Chisinau, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = FAF-242 Root CA
+notBefore=Nov 15 11:31:22 2026 GMT
+notAfter=Nov 12 11:31:22 2036 GMT
+serial=24183F6C40A12255F02131C4314E19FEAE9B64C9
+
+========== 2. Issue keys for alice and bob ==========
+[*] Generating private key for 'alice' (RSA 2048 bits)
+[*] Creating the certificate signing request (CSR)
+[*] CA signs the CSR -> certificate valid 365 days
+[OK] Issued certificate for 'alice'
+subject=C = MD, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = alice
+issuer=C = MD, ST = Chisinau, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = FAF-242 Root CA
+notBefore=Nov 15 11:31:22 2026 GMT
+notAfter=Nov 15 11:31:22 2027 GMT
+serial=1000
+[*] Generating private key for 'bob' (RSA 2048 bits)
+[*] Creating the certificate signing request (CSR)
+[*] CA signs the CSR -> certificate valid 365 days
+[OK] Issued certificate for 'bob'
+subject=C = MD, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = bob
+issuer=C = MD, ST = Chisinau, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = FAF-242 Root CA
+notBefore=Nov 15 11:31:23 2026 GMT
+notAfter=Nov 15 11:31:23 2027 GMT
+serial=1001
+
+========== 3. alice signs a document ==========
+[OK] 'alice' signed /tmp/demo/contract.txt -> /tmp/demo/contract.txt.alice.sig (256 bytes, RSA/sha256)
+     sha256(file) = cd354cf4afaf7df53aceade63a6bdbb12ed55ca6e41b898799676cc2a5fbf92e
+
+========== 4. Verification ==========
+[*] 1) Certificate chain + revocation check (CA + CRL)
+/tmp/demo/pki/users/alice/alice.crt: OK
+[OK] certificate of 'alice' is valid and not revoked
+[*] 2) Cryptographic signature check with the public key from the certificate
+Verified OK
+[OK] signature matches the file
+[OK] RESULT: signature of 'alice' on /tmp/demo/contract.txt is VALID
+
+========== 5. Tampered document ==========
+[*] 1) Certificate chain + revocation check (CA + CRL)
+/tmp/demo/pki/users/alice/alice.crt: OK
+[OK] certificate of 'alice' is valid and not revoked
+[*] 2) Cryptographic signature check with the public key from the certificate
+40B7BBD9E57F0000:error:02000068:rsa routines:ossl_rsa_verify:bad signature:../crypto/rsa/rsa_sign.c:430:
+40B7BBD9E57F0000:error:1C880004:Provider routines:rsa_verify:RSA lib:../providers/implementations/signature/rsa_sig.c:774:
+Verification failure
+[FAIL] signature does NOT match the file
+[FAIL] RESULT: signature of 'alice' on /tmp/demo/contract_modified.txt is REJECTED
+
+========== 6. Wrong signer (bob's certificate) ==========
+[*] 1) Certificate chain + revocation check (CA + CRL)
+/tmp/demo/pki/users/bob/bob.crt: OK
+[OK] certificate of 'bob' is valid and not revoked
+[*] 2) Cryptographic signature check with the public key from the certificate
+40873D73307F0000:error:02000084:rsa routines:rsa_ossl_public_decrypt:data too large for modulus:../crypto/rsa/rsa_ossl.c:661:
+40873D73307F0000:error:1C880004:Provider routines:rsa_verify:RSA lib:../providers/implementations/signature/rsa_sig.c:774:
+Verification failure
+[FAIL] signature does NOT match the file
+[FAIL] RESULT: signature of 'bob' on /tmp/demo/contract.txt is REJECTED
+
+========== 7. Revoke alice ==========
+[*] Revoking certificate of 'alice' (reason: keyCompromise)
+[OK] Certificate revoked, CRL updated: /tmp/demo/pki/ca/crl/ca.crl.pem
+    Serial Number: 1000
+        Revocation Date: Nov 15 11:31:23 2026 GMT
+                Key Compromise
+
+========== 8. Verification after revocation ==========
+[*] 1) Certificate chain + revocation check (CA + CRL)
+C = MD, L = Chisinau, O = UTM FCIM, OU = FAF-242, CN = alice
+error 23 at 0 depth lookup: certificate revoked
+error /tmp/demo/pki/users/alice/alice.crt: verification failed
+[FAIL] certificate of 'alice' is NOT trusted (revoked or invalid)
+[*] 2) Cryptographic signature check with the public key from the certificate
+Verified OK
+[OK] signature matches the file
+[FAIL] RESULT: signature of 'alice' on /tmp/demo/contract.txt is REJECTED
+
+========== 9. Revoked user tries to sign ==========
+[FAIL] certificate of 'alice' is revoked or invalid — signing refused
+
+========== 10. CA database ==========
+STATUS EXPIRES          SERIAL   SUBJECT
+REVOKED 271115113122Z    1000     /C=MD/L=Chisinau/O=UTM FCIM/OU=FAF-242/CN=alice
+valid  271115113123Z    1001     /C=MD/L=Chisinau/O=UTM FCIM/OU=FAF-242/CN=bob
+
+(demo PKI created in /tmp/demo)
