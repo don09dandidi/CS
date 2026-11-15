@@ -1,0 +1,264 @@
+\documentclass[12pt,a4paper]{article}
+\newcommand{\LabNumber}{3}
+\newcommand{\LabTitle}{Cifruri polialfabetice:\\ Cifrul Vigenère pentru limba română}
+\newcommand{\LabTitleShort}{Lucrarea de laborator nr. 3 — Criptografie \& Securitate Informațională}
+\input{../common/preamble}
+
+\begin{document}
+\makereporttitle
+\tableofcontents
+\newpage
+
+\section{Introduction and Laboratory Objectives}
+The weakness of every monoalphabetic cipher (Laboratory Work No.~2) is that the ciphertext
+frequency distribution is a simple relabelling of the plaintext distribution. A cipher becomes
+cryptographically stronger when its distribution is \emph{flattened}, i.e.\ when the same
+plaintext letter can be encrypted into different ciphertext letters depending on its position.
+Polyalphabetic ciphers achieve this by alternating between several substitution alphabets.
+
+The most famous representative is the \textbf{Vigenère cipher}, first described by Giovan
+Battista Bellaso in 1553 (\emph{La cifra del Sig.\ Giovan Battista Bellaso}) and later
+misattributed to Blaise de Vigenère. Instead of a single Caesar shift it applies a sequence of
+shifts $k_0,k_1,\dots,k_{L-1}$ given by the letters of a key word.
+
+According to the group register, the student number is $n = 22$ (even), therefore the assigned
+task is \textbf{Task 3.2}:
+\begin{enumerate}
+  \item Implement the Vigenère algorithm for messages in the \textbf{Romanian language} with an
+        alphabet of \textbf{31 letters}, encoded as $0,1,\dots,30$.
+  \item Accept only letters (\texttt{A}–\texttt{Z}, \texttt{a}–\texttt{z} and the Romanian
+        diacritics); on any other symbol suggest the correct character range to the user.
+  \item Enforce a minimum key length of \textbf{7} letters.
+  \item Before processing, remove all spaces and convert all letters to upper case.
+  \item Let the user choose the operation (encryption/decryption), enter the key and the
+        message/cryptogram, and display the result, using exactly the formulas of the
+        mathematical model.
+\end{enumerate}
+
+\section{Theoretical Foundations}
+\subsection{Encoding of the Romanian Alphabet}
+Let $\Sigma_{RO}$ be the Romanian alphabet with $n = 31$ symbols and let
+$\mathbb{Z}_{31}=\{0,\dots,30\}$. The encoding used throughout the laboratory is given in
+Table~\ref{tab:alpha}.
+
+\begin{table}[H]
+\centering
+\caption{Encoding of the Romanian alphabet ($n = 31$)}
+\label{tab:alpha}
+\small
+\setlength{\tabcolsep}{3.2pt}
+\begin{tabular}{l*{16}{c}}
+\toprule
+Letter & A & Ă & Â & B & C & D & E & F & G & H & I & Î & J & K & L & M \\
+Code   & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 \\
+\midrule
+Letter & N & O & P & Q & R & S & Ș & T & Ț & U & V & W & X & Y & Z & \\
+Code   & 16 & 17 & 18 & 19 & 20 & 21 & 22 & 23 & 24 & 25 & 26 & 27 & 28 & 29 & 30 & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Mathematical Model of the Vigenère Cipher}
+Let the plaintext be $m=(m_0,\dots,m_{N-1})$ and the key $k=(k_0,\dots,k_{L-1})$ with
+$m_i,k_j\in\mathbb{Z}_{31}$ and $L\ge 7$. The key is repeated periodically over the message:
+\begin{align}
+  c_i &= (m_i + k_{i \bmod L}) \bmod 31, \label{eq:enc}\\
+  m_i &= (c_i - k_{i \bmod L}) \bmod 31. \label{eq:dec}
+\end{align}
+Decryption is the inverse operation because $(m_i + k - k) \bmod 31 = m_i$ for every
+$k\in\mathbb{Z}_{31}$. Each key letter selects one of the 31 rows of the \emph{Tabula Recta},
+so the cipher is a periodic sequence of $L$ Caesar ciphers.
+
+\subsection{Key Space and Security}
+For a key of length $L$ over 31 letters, the number of possible keys is $31^{L}$. With the minimum
+admissible length $L = 7$:
+\[
+  |K| = 31^{7} = 27\,512\,614\,111 \approx 2.75\times10^{10},
+\]
+and for $L = 8$ already $|K|\approx 8.53\times10^{11}$. In addition, an attacker does not know
+$L$ in advance. However, once $L$ is found (Kasiski examination or the Index of Coincidence of
+every $L$-th letter, see Lab~2), the cryptogram splits into $L$ independent Caesar ciphers that
+are broken separately by frequency analysis. Long keys (ideally as long as the message, i.e.\ a
+running key / one-time pad) make the cipher considerably harder to attack.
+
+\section{Architecture of the Python Application}
+The application (\texttt{lab3/vigenere\_ro.py}) is written in Python~3 without external
+dependencies. The alphabet is indexed through an explicit lookup table; no ASCII/Unicode
+arithmetic (\texttt{ord}/\texttt{chr}) is used, so the diacritics are handled exactly like the
+other letters.
+
+\begin{infobox}{Application Component Structure}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Data layer:} \texttt{ROMANIAN\_ALPHABET} (31 letters) and the dictionary
+        \texttt{CHAR\_TO\_CODE} implementing Table~\ref{tab:alpha}.
+  \item \textbf{Input layer:} \texttt{normalize()} — unifies Ş/Ţ (cedilla) to Ș/Ț (comma below),
+        removes all whitespace and converts to upper case; \texttt{validate()} and
+        \texttt{prepare\_key()} reject invalid symbols and keys shorter than 7 letters, printing
+        the allowed character range.
+  \item \textbf{Cipher core:} \texttt{vigenere(text, key, decrypt)} implements
+        formulas~\eqref{eq:enc}–\eqref{eq:dec}; with \texttt{trace=True} it prints the step
+        table in the same format as the laboratory guide.
+  \item \textbf{UI layer:} an interactive menu (encrypt / decrypt / exit) and a
+        \texttt{--demo} mode with the deterministic examples used in this report.
+\end{itemize}
+\end{infobox}
+
+\subsection{Cipher Core}
+\begin{lstlisting}[style=py, caption={Core of the Vigenère implementation (excerpt)}]
+def vigenere(text: str, key: str, decrypt: bool = False, trace: bool = False) -> str:
+    sign = -1 if decrypt else 1
+    out = []
+    for i, ch in enumerate(text):
+        m = CHAR_TO_CODE[ch]                    # code of the text letter
+        k = CHAR_TO_CODE[key[i % len(key)]]     # key repeated periodically
+        c = (m + sign * k) % N                  # N = 31
+        out.append(ROMANIAN_ALPHABET[c])
+    return "".join(out)
+\end{lstlisting}
+
+\subsection{Input Normalisation and Validation}
+\begin{lstlisting}[style=py, caption={Normalisation and validation of the input}]
+def normalize(text: str) -> str:
+    text = (text.replace('Ş', 'Ș').replace('ş', 'ș')
+                .replace('Ţ', 'Ț').replace('ţ', 'ț'))
+    text = "".join(text.split())   # remove spaces
+    return text.upper()
+
+def prepare_key(key: str) -> str:
+    key = normalize(key)
+    validate(key, "cheia")         # only the 31 letters are allowed
+    if len(key) < MIN_KEY_LEN:     # MIN_KEY_LEN = 7
+        raise InvalidInputError(...)
+    return key
+\end{lstlisting}
+
+\section{Experimental Results}
+\subsection{Example 1: \textit{Per aspera ad astra}}
+The example from the laboratory guide is repeated over the 31-letter alphabet. The key from the
+guide (\texttt{SUPER}) is shorter than 7 letters and is rejected by the program, so the key
+\texttt{SUPERMAN} ($L=8$) was used.
+
+\begin{table}[H]
+\centering
+\caption{Encryption of \texttt{PERASPERAADASTRA} with $K=$ \texttt{SUPERMAN} (mod 31)}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{l*{16}{c}}
+\toprule
+Plaintext $M$ & P & E & R & A & S & P & E & R & A & A & D & A & S & T & R & A \\
+Key $K$       & S & U & P & E & R & M & A & N & S & U & P & E & R & M & A & N \\
+\midrule
+$m_i$         & 18 & 6 & 20 & 0 & 21 & 18 & 6 & 20 & 0 & 0 & 5 & 0 & 21 & 23 & 20 & 0 \\
+$k_i$         & 21 & 25 & 18 & 6 & 20 & 15 & 0 & 16 & 21 & 25 & 18 & 6 & 20 & 15 & 0 & 16 \\
+$m_i+k_i \bmod 31$ & 8 & 0 & 7 & 6 & 10 & 2 & 6 & 5 & 21 & 25 & 23 & 6 & 10 & 7 & 20 & 16 \\
+\midrule
+Ciphertext $C$ & G & A & F & E & I & Â & E & D & S & U & T & E & I & F & R & N \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Result: $C=$ \texttt{GAFEIÂEDSUTEIFRN}. Note that the five occurrences of \texttt{A} are
+encrypted as \texttt{E}, \texttt{S}, \texttt{U}, \texttt{E} and \texttt{N}, while the two
+\texttt{E} letters produce \texttt{A} and \texttt{E} — the frequency profile of the plaintext is
+no longer preserved. Applying formula~\eqref{eq:dec} with the same key returns
+\texttt{PERASPERAADASTRA}.
+
+\subsection{Example 2: Message with Romanian Diacritics}
+Message: \emph{„Criptografia și securitatea informațională la UTM”}, key \texttt{CHIȘINĂU}
+($L = 8$, contains diacritics):
+
+\begin{terminal}
+\begin{termout}
+$ python3 vigenere_ro.py --demo
+>>> Criptare: M = 'Criptografia și securitatea informațională la UTM'
+    ->  'CRIPTOGRAFIAȘISECURITATEAINFORMAȚIONALĂLAUTM',  K = 'CHIȘINĂU'
+  Textul clar M     C   R   I   P   T   O   G   R   A   F   I   A   Ș   I   S   E
+  Cheia K           C   H   I   Ș   I   N   Ă   U   C   H   I   Ș   I   N   Ă   U
+  Cod M             4  20  10  18  23  17   8  20   0   7  10   0  22  10  21   6
+  Cod K             4   9  10  22  10  16   1  25   4   9  10  22  10  16   1  25
+  M+K (mod 31)      8  29  20   9   2   2   9  14   4  16  20  22   1  26  22   0
+  Criptograma C     G   Y   R   H   Â   Â   H   L   C   N   R   Ș   Ă   V   Ș   A
+  ...
+    C = GYRHÂÂHLCNRȘĂVȘAGBZĂÂNȚACQVYWDNUXQWFIZÂGCBÂE
+>>> Decriptare cu aceeași cheie:
+    M = CRIPTOGRAFIAȘISECURITATEAINFORMAȚIONALĂLAUTM   (corect: True)
+\end{termout}
+\end{terminal}
+
+The final step — re-inserting spaces according to the language and the logic of the message —
+is done manually: \emph{CRIPTOGRAFIA ȘI SECURITATEA INFORMAȚIONALĂ LA UTM}.
+
+\subsection{Interactive Session and Input Validation}
+\begin{terminal}
+\begin{termout}
+$ python3 vigenere_ro.py
+======================================================================
+  LAB 3 — Cifrul Vigenère pentru limba română (31 de litere)
+======================================================================
+  1) Criptare   2) Decriptare   0) Ieșire
+  Opțiunea: 1
+  Cheia (minim 7 litere): abc
+[EROARE] Cheia are 3 litere; lungimea minimă este 7.
+  Cheia (minim 7 litere): CHEIESECRETA
+  Mesajul: Atac în zori!
+[EROARE] Mesajul conține caractere nepermise: !
+  Diapazonul corect: literele 'A'–'Z', 'a'–'z' și diacriticele românești
+  Ă Â Î Ș Ț (31 de litere); spațiile sunt eliminate automat.
+  Mesajul: Atac în zori
+  Text pregătit : ATACÎNZORI
+  Cheia         : CHEIESECRETA
+  ...
+  Criptograma: CĂELOEDSHN
+
+  1) Criptare   2) Decriptare   0) Ieșire
+  Opțiunea: 2
+  Cheia (minim 7 litere): CHEIESECRETA
+  Criptograma: CĂELOEDSHN
+  Mesajul decriptat: ATACÎNZORI
+\end{termout}
+\end{terminal}
+
+\section{Source Code and Repository}
+The complete source code and this report are available in the Git repository:
+\begin{center}
+\url{https://github.com/don09dandidi/CS} \quad (directory \texttt{lab3/})
+\end{center}
+
+\subsection{Build and Execution Instructions}
+\begin{lstlisting}[style=sh]
+# Clone the repository
+git clone https://github.com/don09dandidi/CS.git
+cd CS/lab3
+
+# Interactive mode (encryption / decryption)
+python3 vigenere_ro.py
+
+# Deterministic examples used in this report
+python3 vigenere_ro.py --demo
+\end{lstlisting}
+
+\section{Conclusion}
+\begin{enumerate}
+  \item \textbf{Polyalphabetic substitution:} the Vigenère cipher was implemented for the
+        31-letter Romanian alphabet strictly following
+        $c_i=(m_i+k_i)\bmod 31$ and $m_i=(c_i-k_i)\bmod 31$; decryption with the same key always
+        recovered the original message.
+  \item \textbf{Flattened statistics:} the same plaintext letter is mapped to different
+        ciphertext letters depending on its position, so simple frequency analysis (which broke
+        the cipher of Lab~2) is no longer directly applicable.
+  \item \textbf{Key requirements:} the minimum key length of 7 letters gives
+        $31^7\approx2.75\times10^{10}$ keys; nevertheless the periodic key remains the main
+        weakness — once $L$ is found by Kasiski examination or IC analysis, the cipher reduces to
+        $L$ Caesar ciphers.
+  \item \textbf{Robust input handling:} spaces are removed, the text is upper-cased, cedilla
+        diacritics are unified, and any symbol outside the alphabet is rejected with a message
+        describing the correct range.
+\end{enumerate}
+
+\begin{thebibliography}{9}
+\bibitem{kahn} David Kahn, \emph{The Codebreakers: The Story of Secret Writing}, Scribner, 1996.
+\bibitem{stallings} William Stallings, \emph{Cryptography and Network Security: Principles and
+  Practice}, 7th Edition, Pearson, 2017.
+\bibitem{guide} \emph{Lucrare de laborator nr.~3. Cifruri polialfabetice}, UTM, FCIM, 2026.
+\end{thebibliography}
+\end{document}

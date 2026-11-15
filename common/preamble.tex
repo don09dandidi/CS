@@ -1,0 +1,105 @@
+% ---------------------------------------------------------------------------
+% Common preamble for the CS laboratory reports (compile with XeLaTeX)
+% Strunga Daniel-Ioan, FAF-242 — https://github.com/don09dandidi/CS
+% ---------------------------------------------------------------------------
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{DejaVu Sans Mono}[Scale=0.85]
+\usepackage[english]{babel}
+\babelprovide[import, main]{romanian}
+\usepackage[a4paper, margin=2.5cm, headheight=15pt]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs, array, longtable, tabularx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{fvextra}
+\usepackage[most]{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit, calc}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\definecolor{codebg}{RGB}{248,248,250}
+\definecolor{codeframe}{RGB}{200,200,210}
+\definecolor{kw}{RGB}{0,0,160}
+\definecolor{cmt}{RGB}{0,120,0}
+\definecolor{str}{RGB}{160,30,30}
+\definecolor{termbg}{RGB}{30,32,40}
+\definecolor{termfg}{RGB}{225,228,235}
+\definecolor{termbar}{RGB}{60,63,75}
+\definecolor{boxblue}{RGB}{230,238,250}
+
+\lstdefinestyle{py}{
+  language=Python, basicstyle=\ttfamily\small, backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{codeframe}, numbers=left, numberstyle=\tiny\color{gray},
+  keywordstyle=\color{kw}\bfseries, commentstyle=\color{cmt}\itshape, stringstyle=\color{str},
+  breaklines=true, showstringspaces=false, columns=fullflexible, keepspaces=true, tabsize=4,
+  extendedchars=true, inputencoding=utf8
+}
+\lstdefinestyle{sh}{
+  language=bash, basicstyle=\ttfamily\small, backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{codeframe}, numbers=left, numberstyle=\tiny\color{gray},
+  keywordstyle=\color{kw}\bfseries, commentstyle=\color{cmt}\itshape, stringstyle=\color{str},
+  breaklines=true, showstringspaces=false, columns=fullflexible, keepspaces=true
+}
+\lstdefinestyle{wl}{
+  basicstyle=\ttfamily\small, backgroundcolor=\color{codebg},
+  frame=single, rulecolor=\color{codeframe}, numbers=left, numberstyle=\tiny\color{gray},
+  morekeywords={RandomPrime,RandomInteger,PowerMod,Mod,GCD,FromDigits,IntegerDigits,
+    ToCharacterCode,FromCharacterCode,IntegerLength,BitLength,Module,Print,Hash,Length},
+  keywordstyle=\color{kw}\bfseries, commentstyle=\color{cmt}\itshape,
+  morecomment=[s]{(*}{*)}, breaklines=true, columns=fullflexible, keepspaces=true
+}
+
+% Console session box (as in the Lab 2 report)
+\newtcolorbox{terminal}[1][Sesiune Terminal Consolă]{
+  enhanced, breakable, colback=termbg, colframe=termbar, coltext=termfg,
+  fonttitle=\small\ttfamily\bfseries, title={\textbullet\textbullet\textbullet\quad #1},
+  left=4pt, right=4pt, top=2pt, bottom=2pt, boxrule=0.6pt, arc=2pt
+}
+\DefineVerbatimEnvironment{termout}{Verbatim}{fontsize=\scriptsize, breaklines=true, breakanywhere=true}
+
+\newtcolorbox{infobox}[1]{
+  enhanced, breakable, colback=boxblue, colframe=kw!60, fonttitle=\bfseries,
+  title={#1}, boxrule=0.6pt, arc=2pt
+}
+
+\newcommand{\bignum}[1]{\par\nobreak\vspace{1pt}{\noindent\ttfamily\footnotesize\seqsplit{#1}\par}\vspace{5pt}}
+\usepackage{seqsplit}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\footnotesize\textit{\LabTitleShort}}
+\fancyhead[R]{\footnotesize strunga.daniel-ioan}
+\fancyfoot[C]{\thepage}
+
+\newcommand{\makereporttitle}{%
+\begin{titlepage}
+  \centering
+  {\large\bfseries UNIVERSITATEA TEHNICĂ A MOLDOVEI\par}
+  \vspace{2pt}
+  {\normalsize Facultatea Calculatoare, Informatică și Microelectronică\par}
+  {\normalsize Departamentul Ingineria Software și Automatică\par}
+  \vspace{5cm}
+  {\LARGE\bfseries LUCRAREA DE LABORATOR NR. \LabNumber\par}
+  \vspace{8pt}
+  {\Large\bfseries \LabTitle\par}
+  \vspace{10pt}
+  {\normalsize Disciplina: Criptografie și Securitate Informațională\par}
+  \vfill
+  \begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    \textbf{Autor:} & \textbf{Verificat de:} \\
+    Daniel-Ioan Strunga & Lector / Supervizor \\
+    Student gr. FAF-242 & Maia Zaica \\
+  \end{tabular*}
+  \vspace{3cm}
+
+  {\normalsize Chișinău — 2026\par}
+\end{titlepage}
+}

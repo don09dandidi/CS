@@ -1,0 +1,48 @@
+  Codificarea alfabetului (n = 31):
+      A   Ă   Â   B   C   D   E   F   G   H   I   Î   J   K   L   M
+      0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+      N   O   P   Q   R   S   Ș   T   Ț   U   V   W   X   Y   Z
+     16  17  18  19  20  21  22  23  24  25  26  27  28  29  30
+
+>>> Criptare: M = 'Per aspera ad astra'  ->  'PERASPERAADASTRA',  K = 'SUPERMAN'
+  Textul clar M     P   E   R   A   S   P   E   R   A   A   D   A   S   T   R   A
+  Cheia K           S   U   P   E   R   M   A   N   S   U   P   E   R   M   A   N
+  Cod M            18   6  20   0  21  18   6  20   0   0   5   0  21  23  20   0
+  Cod K            21  25  18   6  20  15   0  16  21  25  18   6  20  15   0  16
+  M+K (mod 31)      8   0   7   6  10   2   6   5  21  25  23   6  10   7  20  16
+  Criptograma C     G   A   F   E   I   Â   E   D   S   U   T   E   I   F   R   N
+
+    C = GAFEIÂEDSUTEIFRN
+>>> Decriptare cu aceeași cheie:
+    M = PERASPERAADASTRA   (corect: True)
+
+>>> Criptare: M = 'Criptografia și securitatea informațională la UTM'  ->  'CRIPTOGRAFIAȘISECURITATEAINFORMAȚIONALĂLAUTM',  K = 'CHIȘINĂU'
+  Textul clar M     C   R   I   P   T   O   G   R   A   F   I   A   Ș   I   S   E
+  Cheia K           C   H   I   Ș   I   N   Ă   U   C   H   I   Ș   I   N   Ă   U
+  Cod M             4  20  10  18  23  17   8  20   0   7  10   0  22  10  21   6
+  Cod K             4   9  10  22  10  16   1  25   4   9  10  22  10  16   1  25
+  M+K (mod 31)      8  29  20   9   2   2   9  14   4  16  20  22   1  26  22   0
+  Criptograma C     G   Y   R   H   Â   Â   H   L   C   N   R   Ș   Ă   V   Ș   A
+
+  Textul clar M     C   U   R   I   T   A   T   E   A   I   N   F   O   R   M   A
+  Cheia K           C   H   I   Ș   I   N   Ă   U   C   H   I   Ș   I   N   Ă   U
+  Cod M             4  25  20  10  23   0  23   6   0  10  16   7  17  20  15   0
+  Cod K             4   9  10  22  10  16   1  25   4   9  10  22  10  16   1  25
+  M+K (mod 31)      8   3  30   1   2  16  24   0   4  19  26  29  27   5  16  25
+  Criptograma C     G   B   Z   Ă   Â   N   Ț   A   C   Q   V   Y   W   D   N   U
+
+  Textul clar M     Ț   I   O   N   A   L   Ă   L   A   U   T   M
+  Cheia K           C   H   I   Ș   I   N   Ă   U   C   H   I   Ș
+  Cod M            24  10  17  16   0  14   1  14   0  25  23  15
+  Cod K             4   9  10  22  10  16   1  25   4   9  10  22
+  M+K (mod 31)     28  19  27   7  10  30   2   8   4   3   2   6
+  Criptograma C     X   Q   W   F   I   Z   Â   G   C   B   Â   E
+
+    C = GYRHÂÂHLCNRȘĂVȘAGBZĂÂNȚACQVYWDNUXQWFIZÂGCBÂE
+>>> Decriptare cu aceeași cheie:
+    M = CRIPTOGRAFIAȘISECURITATEAINFORMAȚIONALĂLAUTM   (corect: True)
+
+>>> Validare intrări greșite:
+    [EROARE] Cheia are 6 litere; lungimea minimă este 7.
+    [EROARE] Mesajul conține caractere nepermise: ! 0 2 6
+  Diapazonul corect: literele 'A'–'Z', 'a'–'z' și diacriticele românești Ă Â Î Ș Ț (31 de litere); spațiile sunt eliminate automat.
