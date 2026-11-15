@@ -1,0 +1,245 @@
+\documentclass[12pt,a4paper]{article}
+\newcommand{\LabNumber}{6}
+\newcommand{\LabTitle}{Funcții hash și semnături digitale:\\ RSA și ElGamal cu HAVAL-224,4}
+\newcommand{\LabTitleShort}{Lucrarea de laborator nr. 6 — Criptografie \& Securitate Informațională}
+\input{../common/preamble}
+
+\begin{document}
+\makereporttitle
+\tableofcontents
+\newpage
+
+\section{Introduction and Laboratory Objectives}
+A \textbf{digital signature} gives a document the properties of a handwritten signature —
+authenticity, integrity and non-repudiation — using public-key cryptography. Because public-key
+operations are slow and work on numbers smaller than the modulus, the document itself is not
+signed: a \textbf{cryptographic hash function} first compresses it into a short fixed-length
+digest, and the digest is signed (\emph{hash-then-sign}).
+
+The variant is determined by the student's number in the group list, $k = <<k>>$:
+\[
+  i = (k \bmod 24) + 1 = (<<k>> \bmod 24) + 1 = <<hash_index>>
+\]
+In \emph{both} lists of the assignment (Task 2 and Task 3) index 23 corresponds to
+\textbf{HAVAL-224,4} — the HAVAL hash with a 224-bit digest and 4 passes.
+
+Objectives:
+\begin{enumerate}
+  \item \textbf{Task 2} — generate RSA keys with $n \ge 3072$ bits, sign the message $m$ obtained
+        in Laboratory Work No.~2 and validate the signature, using HAVAL-224,4.
+  \item \textbf{Task 3} — sign and validate the same message with the \textbf{ElGamal} signature
+        scheme, using the given 2048-bit prime $p$ and generator $g=2$, and HAVAL-224,4.
+  \item Use the decimal representation of the hash value and comment every step of the algorithms.
+\end{enumerate}
+
+\begin{infobox}{Tooling note}
+The guide suggests Wolfram Alpha / Mathematica. Wolfram's \texttt{Hash[]} function does not
+implement HAVAL, so the digest was computed with a pure-Python implementation of HAVAL
+(\texttt{lab6/haval.py}, checked against PHP's \texttt{hash("haval224,4", ...)}) and then
+converted from hexadecimal to decimal. The modular arithmetic was performed with
+\texttt{lab6/digital\_signatures.py} (Python integers, the same operations as \texttt{RandomPrime},
+\texttt{RandomInteger}, \texttt{PowerMod}, \texttt{Mod}); the equivalent Wolfram Language code is
+given in Appendix~\ref{app:wl}.
+\end{infobox}
+
+\section{The Message}
+The message $m$ is the plaintext recovered in Laboratory Work No.~2 (Variant 22, a fragment of
+D.~Kahn's \emph{The Codebreakers} about William F.~Friedman). It is stored in
+\texttt{lab6/message\_lab2.txt} as UTF-8 text, three paragraphs separated by a newline, without a
+trailing newline: \textbf{<<msg_len>> bytes}.
+\begin{infobox}{$m$ (beginning and end)}
+\small\itshape While Herbert Yardley may be the best known cryptologist, uncontestably the greatest
+is William Frederick Friedman. Unlike his contemporary, his eminence is due most emphatically to
+what he did. [\dots] A cardinal article of faith with him was that a well-executed sales campaign
+could put across almost anything.
+\end{infobox}
+
+\section{The HAVAL Hash Function}
+\subsection{Description}
+HAVAL was proposed by Y.~Zheng, J.~Pieprzyk and J.~Seberry (AUSCRYPT'92). It is a
+Merkle–Damgård hash of the MD family, with two parameters: the number of passes (3, 4 or 5) and
+the digest length (128, 160, 192, 224 or 256 bits).
+\begin{itemize}
+  \item \textbf{State:} eight 32-bit words, initialised with the first 256 bits of the fractional
+        part of $\pi$:\\ {\small\texttt{243F6A88 85A308D3 13198A2E 03707344 A4093822 299F31D0 082EFA98 EC4E6C89}}.
+  \item \textbf{Padding:} append byte \texttt{0x01}, then zeros up to 944 bits mod 1024, then
+        16 bits encoding VERSION=1, PASS and FPTLEN, then the 64-bit message length
+        (little-endian). The message is processed in \textbf{1024-bit blocks} of 32 words.
+  \item \textbf{Compression:} each pass has 32 steps. Step $j$ of pass $r$ updates one register:
+        \[ T = F_r\big(\phi_{P,r}(x_6,\dots,x_0)\big),\qquad
+           x_7 \leftarrow (T \ggg 7) + (x_7 \ggg 11) + W_{\mathrm{ord}_r(j)} + K_{r,j}, \]
+        where $F_1\dots F_5$ are highly non-linear Boolean functions of 7 variables, $\phi_{P,r}$
+        is a fixed permutation of the inputs (depending on the number of passes $P$),
+        $\mathrm{ord}_r$ a word order and $K_{r,j}$ further words of $\pi$ (none in pass 1). After
+        all passes the result is added word-wise to the old state.
+  \item \textbf{Tailoring (224 bits):} the 256-bit state is folded to 224 bits by adding 5- and
+        4-bit fields of the last word $H_7$ to $H_0\dots H_6$.
+\end{itemize}
+HAVAL-224,4 therefore has $4\times32 = 128$ steps per block. Its security is lower than that of
+SHA-2/SHA-3 (collisions for 3-pass HAVAL were found in 2004), so in practice it should not be
+used for new signatures; here it is used as required by the variant.
+
+\subsection{Implementation and Validation}
+\begin{lstlisting}[style=py, caption={Compression function of HAVAL (\texttt{haval.py}, excerpt)}]
+def _compress(state, block: bytes, passes: int):
+    w = [int.from_bytes(block[4*i:4*i+4], "little") for i in range(32)]
+    t = list(state)
+    for p in range(passes):
+        f, phi = _F[p], _PHI[passes][p]
+        for s in range(32):
+            x = [t[(j - s) % 8] for j in range(8)]        # x7..x0 rotate each step
+            temp = f(*[x[j] for j in phi]) & MASK
+            new = (_rotr(temp, 7) + _rotr(x[7], 11) + w[ORDER[p][s]]) & MASK
+            if p > 0:
+                new = (new + CONST[p][s]) & MASK
+            t[(7 - s) % 8] = new
+    return [(a + b) & MASK for a, b in zip(state, t)]
+\end{lstlisting}
+The implementation was compared with PHP's \texttt{hash()} for HAVAL-224 and HAVAL-256 with 3,
+4 and 5 passes on 10 inputs of different lengths (including the block boundaries 117–129 bytes):
+all 60 digests are identical. For example
+\texttt{HAVAL-224,4("")} $=$ \texttt{3e56243275b3b81561750550e36fcd676ad2f5dd9e15f2e89e6ed78e}.
+
+\subsection{Digest of the Message}
+\noindent\textbf{Hexadecimal digest} $\mathrm{HAVAL\text{-}224,4}(m)$:
+\bignum{<<h_hex>>}
+\noindent\textbf{Decimal value} $h$ (<<h_bits>> bits), used in both signatures:
+\bignum{<<h>>}
+\textbf{Avalanche effect:} replacing a single letter (the first ``Friedman'' $\to$ ``Fridman'')
+gives the completely different digest
+\bignum{<<hf_hex>>}
+
+\section{Task 2 — RSA Digital Signature}
+\subsection{Algorithm}
+\begin{enumerate}
+  \item \textbf{Key generation:} random primes $p, q$ of 1536 bits each, $n = pq$ (3072 bits),
+        $\varphi(n) = (p-1)(q-1)$, $e = 65537$ with $\gcd(e,\varphi(n)) = 1$,
+        $d = e^{-1} \bmod \varphi(n)$. Public key $(e,n)$, private key $(d,n)$.
+  \item \textbf{Signing} (with the private key): $h = H(m)$, \quad $s = h^{d} \bmod n$.
+        The signed message is the pair $(m, s)$.
+  \item \textbf{Verification} (with the public key): compute $h = H(m)$ from the received message
+        and $h' = s^{e} \bmod n$; the signature is valid iff $h' = h$.
+\end{enumerate}
+Since $h < 2^{224} < n$, the digest is signed directly as a number (\emph{textbook} RSA signature;
+real systems apply PKCS\#1 v1.5 or PSS padding first).
+
+\subsection{Key Generation}
+\noindent\textbf{Prime} $p$ (1536 bits):
+\bignum{<<rsa.p>>}
+\noindent\textbf{Prime} $q$ (1536 bits):
+\bignum{<<rsa.q>>}
+\noindent\textbf{Modulus} $n = p\cdot q$ (\textbf{<<rsa.n_bits>> bits}):
+\bignum{<<rsa.n>>}
+\noindent\textbf{Euler's function} $\varphi(n)$:
+\bignum{<<rsa.phi>>}
+\noindent\textbf{Public exponent} $e = <<rsa.e>>$; \textbf{private exponent} $d = e^{-1} \bmod \varphi(n)$:
+\bignum{<<rsa.d>>}
+
+\subsection{Signing and Verification}
+\noindent\textbf{Signature} $s = h^{d} \bmod n$:
+\bignum{<<rsa.s>>}
+\noindent\textbf{Verification} $h' = s^{e} \bmod n$:
+\bignum{<<rsa.h_check>>}
+$h' = h$ $\Rightarrow$ the signature is \textbf{valid} (<<rsa.valid>>). For the modified message
+$m'$, $h' \ne H(m')$ $\Rightarrow$ the signature is rejected (check $=$ <<rsa.valid_fake>>).
+
+\section{Task 3 — ElGamal Digital Signature}
+\subsection{Algorithm}
+Public parameters: the given 2048-bit prime $p$ and the generator $g = 2$.
+\begin{enumerate}
+  \item \textbf{Key generation:} private key $x$ random, $1 < x < p-1$; public key
+        $y = g^{x} \bmod p$.
+  \item \textbf{Signing:} choose a random $k$, $1<k<p-1$, with $\gcd(k, p-1) = 1$ (so that
+        $k^{-1} \bmod (p-1)$ exists) and compute
+        \[ r = g^{k} \bmod p, \qquad s = (h - x\,r)\,k^{-1} \bmod (p-1). \]
+        The signature is the pair $(r,s)$.
+  \item \textbf{Verification:} accept iff $0<r<p$ and
+        \[ g^{h} \equiv y^{r}\, r^{s} \pmod p. \]
+\end{enumerate}
+\textbf{Correctness:} from the definition of $s$, $h \equiv x r + k s \pmod{p-1}$, therefore
+$g^{h} = g^{xr}\,g^{ks} = (g^{x})^{r}(g^{k})^{s} = y^{r} r^{s} \pmod p$ (Fermat's little theorem
+allows exponents to be reduced modulo $p-1$). The value $k$ must be secret and unique for every
+signature — reusing it reveals the private key $x$.
+
+\subsection{Values}
+\noindent\textbf{Prime} $p$ (given, 2048 bits), $g = 2$:
+\bignum{<<P>>}
+\noindent\textbf{Private key} $x$:
+\bignum{<<eg.x>>}
+\noindent\textbf{Public key} $y = g^{x} \bmod p$:
+\bignum{<<eg.y>>}
+\noindent\textbf{Random} $k$ ($\gcd(k,p-1) = <<eg.gcd_k>>$):
+\bignum{<<eg.k>>}
+\noindent$k^{-1} \bmod (p-1)$:
+\bignum{<<eg.k_inv>>}
+\noindent\textbf{Signature} $r = g^{k} \bmod p$:
+\bignum{<<eg.r>>}
+\noindent\textbf{Signature} $s = (h - x r)\,k^{-1} \bmod (p-1)$:
+\bignum{<<eg.s>>}
+
+\subsection{Verification}
+\noindent Left side $g^{h} \bmod p$:
+\bignum{<<eg.left>>}
+\noindent Right side $y^{r} r^{s} \bmod p$:
+\bignum{<<eg.right>>}
+The two sides are equal $\Rightarrow$ the signature is \textbf{valid} (<<eg.valid>>). For the
+modified message $m'$, $g^{H(m')} \ne y^{r} r^{s}$ and the signature is rejected
+(check $=$ <<eg.valid_fake>>).
+
+\section{Source Code and Repository}
+\begin{center}
+\url{https://github.com/don09dandidi/CS} \quad (directory \texttt{lab6/})
+\end{center}
+\begin{lstlisting}[style=py, caption={Signing and verification (excerpt from \texttt{digital\_signatures.py})}]
+h = int(haval224_4(message_bytes), 16)          # decimal value of the digest
+
+# RSA (n = 3072 bits)
+s = pow(h, d, n)                                # sign
+valid = pow(s, e, n) == h                       # verify
+
+# ElGamal (p = 2048 bits, g = 2)
+r = pow(G, k, P)
+s = ((h - x * r) * pow(k, -1, P - 1)) % (P - 1)  # sign: (r, s)
+valid = pow(G, h, P) == (pow(y, r, P) * pow(r, s, P)) % P
+\end{lstlisting}
+
+\subsection{Build and Execution Instructions}
+\begin{lstlisting}[style=sh]
+git clone https://github.com/don09dandidi/CS.git
+cd CS/lab6
+python3 haval.py < message_lab2.txt        # HAVAL-224,4 digest of the message
+python3 digital_signatures.py --save       # keys, signatures, verification -> results.json
+\end{lstlisting}
+
+\section{Conclusion}
+\begin{enumerate}
+  \item For $k = 22$ the hash function is HAVAL-224,4; it was implemented from its specification,
+        validated against an independent implementation, and produced the 224-bit digest of the
+        Lab~2 message, used in decimal form.
+  \item \textbf{RSA signature:} with a 3072-bit modulus the digest was signed with the private
+        exponent and verified with the public one ($s^{e} \bmod n = h$).
+  \item \textbf{ElGamal signature:} with the given 2048-bit prime and $g=2$ the signature
+        $(r,s)$ was generated with a random $k$ coprime to $p-1$ and verified through
+        $g^{h} \equiv y^{r} r^{s} \pmod p$.
+  \item In both schemes a single-letter change of the message produces a completely different
+        digest and the signature is rejected, demonstrating integrity protection. RSA signatures
+        are deterministic and short to verify ($e$ small); ElGamal signatures are randomised and
+        twice as long, and their security depends critically on never reusing $k$.
+\end{enumerate}
+
+\appendix
+\section{Wolfram Language Code}\label{app:wl}
+\lstinputlisting[style=wl]{wolfram/lab6.wl}
+
+\begin{thebibliography}{9}
+\bibitem{haval} Y.\ Zheng, J.\ Pieprzyk, J.\ Seberry, \emph{HAVAL — A One-Way Hashing Algorithm
+  with Variable Length of Output}, AUSCRYPT'92, LNCS 718, 1993.
+\bibitem{rsa} R.\ Rivest, A.\ Shamir, L.\ Adleman, \emph{A Method for Obtaining Digital Signatures
+  and Public-Key Cryptosystems}, Communications of the ACM, 21(2), 1978.
+\bibitem{elg} T.\ ElGamal, \emph{A Public Key Cryptosystem and a Signature Scheme Based on Discrete
+  Logarithms}, IEEE Trans.\ Inf.\ Theory, 31(4), 1985.
+\bibitem{kahn} David Kahn, \emph{The Codebreakers: The Story of Secret Writing}, Scribner, 1996.
+\bibitem{stallings} William Stallings, \emph{Cryptography and Network Security: Principles and
+  Practice}, 7th Edition, Pearson, 2017.
+\end{thebibliography}
+\end{document}
