@@ -1,0 +1,239 @@
+\documentclass[12pt,a4paper]{article}
+\newcommand{\LabNumber}{5}
+\newcommand{\LabTitle}{Criptografia cu chei publice:\\ RSA, ElGamal și Diffie–Hellman}
+\newcommand{\LabTitleShort}{Lucrarea de laborator nr. 5 — Criptografie \& Securitate Informațională}
+\input{../common/preamble}
+
+\begin{document}
+\makereporttitle
+\tableofcontents
+\newpage
+
+\section{Introduction and Laboratory Objectives}
+Public-key (asymmetric) cryptography, introduced by Diffie and Hellman in 1976, removes the need
+for a secret channel to distribute keys: every participant owns a key pair — a public key that
+can be published and a private key that is never disclosed. Its security rests on
+computationally hard number-theoretic problems: \textbf{integer factorisation} (RSA) and the
+\textbf{discrete logarithm problem} in $\mathbb{Z}_p^*$ (ElGamal, Diffie–Hellman).
+
+Objectives of the laboratory work:
+\begin{enumerate}
+  \item \textbf{Task 2.1} — generate RSA keys with a modulus of at least 2048 bits, encrypt and
+        decrypt the message $m=$ \textit{„Nume Prenume”} $=$ \texttt{"<<message>>"}.
+  \item \textbf{Task 2.2} — generate ElGamal keys for the given 2048-bit prime $p$ and generator
+        $g=2$, encrypt and decrypt the same message.
+  \item \textbf{Task 3} — perform the Diffie–Hellman key exchange between Alice and Bob, who will
+        use AES with a 256-bit key; the secrets $a$ and $b$ are chosen randomly according to the
+        requirements of the algorithm.
+  \item Comment in detail every step of the algorithms.
+\end{enumerate}
+
+\begin{infobox}{Tooling note}
+The laboratory guide suggests Wolfram Alpha / Mathematica. All computations in this report were
+performed with the script \texttt{lab5/public\_key\_crypto.py}, which uses only Python's
+arbitrary-precision integers and the exact equivalents of the Wolfram functions
+(\texttt{RandomPrime}, \texttt{RandomInteger}, \texttt{PowerMod}, \texttt{Mod}). The same steps
+written in Wolfram Language are given in \texttt{lab5/wolfram/lab5.wl} and in
+Appendix~\ref{app:wl}; random values will of course differ from run to run.
+\end{infobox}
+
+\section{Message Encoding}
+As required, the message is converted to a decimal number through the hexadecimal representation
+of its ASCII codes:
+
+\begin{table}[H]
+\centering
+\caption{ASCII encoding of the message}
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l*{14}{c}}
+\toprule
+<<ascii_table>>
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{align*}
+  \text{hex}(m) &= \texttt{<<hex>>}\\
+  m &= <<m>> \quad (<<m_bits>>\text{ bits})
+\end{align*}
+Since $m < n$ (RSA) and $m < p$ (ElGamal), the message is encrypted as a single block. Decoding is
+the reverse process: the decimal number is written in base 256 and every digit is an ASCII code.
+
+\section{Task 2.1 — RSA}
+\subsection{Algorithm}
+\begin{enumerate}
+  \item Choose two large random primes $p$ and $q$ of 1024 bits each (the two most significant
+        bits set, so that $n$ has exactly 2048 bits).
+  \item Compute the modulus $n = p\cdot q$ and Euler's function $\varphi(n)=(p-1)(q-1)$.
+  \item Choose the public exponent $e$ with $1<e<\varphi(n)$, $\gcd(e,\varphi(n))=1$; the
+        standard value $e = 2^{16}+1 = 65537$ is used.
+  \item Compute the private exponent $d = e^{-1} \bmod \varphi(n)$ (extended Euclid).
+  \item Public key: $(e,n)$; private key: $(d,n)$.
+  \item Encryption: $c = m^{e} \bmod n$; decryption: $m = c^{d} \bmod n$.
+\end{enumerate}
+Correctness follows from Euler's theorem: $c^d = m^{ed} = m^{1+t\varphi(n)} \equiv m \pmod n$.
+
+\subsection{Key Generation}
+\noindent\textbf{Prime} $p$ (1024 bits):
+\bignum{<<rsa.p>>}
+\noindent\textbf{Prime} $q$ (1024 bits):
+\bignum{<<rsa.q>>}
+\noindent\textbf{Modulus} $n=p\cdot q$ (\textbf{<<rsa.n_bits>> bits}):
+\bignum{<<rsa.n>>}
+\noindent\textbf{Euler's function} $\varphi(n)=(p-1)(q-1)$:
+\bignum{<<rsa.phi>>}
+\noindent\textbf{Public exponent:} $e = <<rsa.e>>$, \quad $\gcd(e,\varphi(n)) = 1$.\\[4pt]
+\noindent\textbf{Private exponent} $d = e^{-1} \bmod \varphi(n)$:
+\bignum{<<rsa.d>>}
+Check: $e\cdot d \bmod \varphi(n) = <<rsa.check_ed>>$.
+
+\subsection{Encryption and Decryption}
+\noindent\textbf{Ciphertext} $c = m^{e} \bmod n$:
+\bignum{<<rsa.c>>}
+\noindent\textbf{Decryption} $c^{d} \bmod n$:
+\bignum{<<rsa.m_decrypted>>}
+which is equal to $m$; converting it back to ASCII gives \texttt{"<<message>>"}.
+
+\section{Task 2.2 — ElGamal}
+\subsection{Algorithm}
+The public parameters are the given prime $p$ (2048 bits) and the generator $g=2$. The prime is a
+\emph{safe prime} ($p=2q'+1$ with $q'$ prime — verified with the Miller–Rabin test), so the
+discrete logarithm problem in $\mathbb{Z}_p^*$ has no small subgroups to exploit.
+\begin{enumerate}
+  \item \textbf{Key generation (receiver):} choose the private key $x$ randomly,
+        $1 < x < p-1$, and publish $y = g^{x} \bmod p$. Public key: $(p,g,y)$.
+  \item \textbf{Encryption (sender):} choose a fresh random ephemeral key $k$, $1<k<p-1$, and
+        compute
+        $c_1 = g^{k} \bmod p$, \; $c_2 = m\cdot y^{k} \bmod p$. The ciphertext is $(c_1,c_2)$.
+  \item \textbf{Decryption (receiver):} the shared value is $s=c_1^{x}=g^{kx}$, and
+        $m = c_2 \cdot s^{-1} \bmod p = c_2 \cdot c_1^{\,p-1-x} \bmod p$ (Fermat: $s^{-1}=s^{p-2}$,
+        and $c_1^{p-1-x}=c_1^{-x}$).
+\end{enumerate}
+The ephemeral key $k$ must never be reused: from two ciphertexts with the same $k$ one obtains
+$m_1/m_2 = c_2/c_2'$.
+
+\subsection{Values}
+\noindent\textbf{Prime} $p$ (given, 2048 bits) and $g = 2$:
+\bignum{<<P>>}
+\noindent\textbf{Private key} $x$:
+\bignum{<<eg.x>>}
+\noindent\textbf{Public key} $y = g^{x} \bmod p$:
+\bignum{<<eg.y>>}
+\noindent\textbf{Ephemeral key} $k$:
+\bignum{<<eg.k>>}
+\noindent\textbf{Ciphertext} $c_1 = g^{k} \bmod p$:
+\bignum{<<eg.c1>>}
+\noindent\textbf{Ciphertext} $c_2 = m \cdot y^{k} \bmod p$:
+\bignum{<<eg.c2>>}
+\noindent\textbf{Decryption} $m = c_2 \cdot c_1^{\,p-1-x} \bmod p$:
+\bignum{<<eg.m_decrypted>>}
+The decrypted number equals $m$ and decodes to \texttt{"<<message>>"}.
+
+\section{Task 3 — Diffie–Hellman Key Exchange for AES-256}
+\subsection{Protocol}
+Alice and Bob agree publicly on $p$ (2048 bits) and $g=2$.
+\begin{enumerate}
+  \item Alice chooses a random secret $a$, $1<a<p-1$, and sends $A = g^{a} \bmod p$ to Bob.
+  \item Bob chooses a random secret $b$, $1<b<p-1$, and sends $B = g^{b} \bmod p$ to Alice.
+  \item Alice computes $K_A = B^{a} \bmod p$, Bob computes $K_B = A^{b} \bmod p$; both equal
+        $g^{ab} \bmod p$. An eavesdropper sees only $p,g,A,B$ and would need to solve the
+        discrete logarithm (or the Diffie–Hellman problem) to obtain $K$.
+  \item The shared secret has 2048 bits while AES-256 needs exactly 256 bits, so a key-derivation
+        step is applied: $K_{AES} = \mathrm{SHA\text{-}256}(K)$, where $K$ is written as 256
+        big-endian bytes. Both parties obtain the same 256-bit key.
+\end{enumerate}
+The exchange as such is not authenticated; in practice the values $A$ and $B$ are signed (or
+certified, see the PKI laboratory) to prevent man-in-the-middle attacks.
+
+\subsection{Values}
+\noindent\textbf{Alice's secret} $a$:
+\bignum{<<dh.a>>}
+\noindent\textbf{Bob's secret} $b$:
+\bignum{<<dh.b>>}
+\noindent\textbf{Alice sends} $A = g^{a} \bmod p$:
+\bignum{<<dh.A>>}
+\noindent\textbf{Bob sends} $B = g^{b} \bmod p$:
+\bignum{<<dh.B>>}
+\noindent\textbf{Alice computes} $K_A = B^{a} \bmod p$:
+\bignum{<<dh.K_alice>>}
+\noindent\textbf{Bob computes} $K_B = A^{b} \bmod p$:
+\bignum{<<dh.K_bob>>}
+$K_A = K_B$: \textbf{<<dh.equal>>}.\\[4pt]
+\noindent\textbf{AES-256 key} $K_{AES}=\mathrm{SHA\text{-}256}(K)$ (256 bits, hex):
+\bignum{<<dh.aes_key_hex>>}
+
+\subsection{Using the Key}
+To demonstrate that the key is usable, Alice encrypts the message with AES-256-GCM and Bob decrypts it:
+\begin{terminal}
+\begin{termout}
+nonce      = <<dh.aes_nonce>>
+ciphertext = <<dh.aes_ciphertext>>
+decrypted  = <<dh.aes_decrypted>>
+\end{termout}
+\end{terminal}
+
+\section{Source Code and Repository}
+\begin{center}
+\url{https://github.com/don09dandidi/CS} \quad (directory \texttt{lab5/})
+\end{center}
+\begin{lstlisting}[style=py, caption={Core of the three tasks (excerpt from \texttt{public\_key\_crypto.py})}]
+# RSA
+n, phi = p * q, (p - 1) * (q - 1)
+d = pow(e, -1, phi)                    # PowerMod[e, -1, phi]
+c = pow(m, e, n); m2 = pow(c, d, n)    # PowerMod[m, e, n], PowerMod[c, d, n]
+
+# ElGamal
+x = random_in(2, P - 2); y = pow(G, x, P)
+k = random_in(2, P - 2)
+c1, c2 = pow(G, k, P), (m * pow(y, k, P)) % P
+m2 = (c2 * pow(c1, P - 1 - x, P)) % P
+
+# Diffie-Hellman
+a, b = random_in(2, P - 2), random_in(2, P - 2)
+A, B = pow(G, a, P), pow(G, b, P)
+k_alice, k_bob = pow(B, a, P), pow(A, b, P)
+aes_key = hashlib.sha256(k_alice.to_bytes(256, "big")).digest()
+\end{lstlisting}
+
+\subsection{Build and Execution Instructions}
+\begin{lstlisting}[style=sh]
+git clone https://github.com/don09dandidi/CS.git
+cd CS/lab5
+pip install cryptography          # optional, only for the AES-256-GCM demo
+python3 public_key_crypto.py --save   # prints all values, saves results.json
+\end{lstlisting}
+
+\section{Conclusion}
+\begin{enumerate}
+  \item \textbf{RSA:} keys with a <<rsa.n_bits>>-bit modulus were generated; the message
+        \texttt{"<<message>>"} was encrypted with $(e,n)$ and correctly recovered with $(d,n)$.
+        Security relies on the difficulty of factoring $n$ — knowing $p,q$ immediately yields
+        $\varphi(n)$ and $d$.
+  \item \textbf{ElGamal:} with the 2048-bit safe prime and $g=2$ the message was encrypted into the
+        pair $(c_1,c_2)$ and decrypted correctly. ElGamal is probabilistic (a fresh $k$ gives a
+        different ciphertext each time) and the ciphertext is twice as long as the message.
+  \item \textbf{Diffie–Hellman:} Alice and Bob obtained the same 2048-bit secret without
+        transmitting it, and derived from it a 256-bit AES key with SHA-256, which was then used
+        for authenticated encryption with AES-256-GCM.
+  \item In practice textbook RSA/ElGamal are combined with padding schemes (OAEP) and authenticated
+        key exchange; they are used to transport symmetric keys rather than to encrypt bulk data.
+\end{enumerate}
+
+\appendix
+\section{Wolfram Language Code}\label{app:wl}
+\lstinputlisting[style=wl]{wolfram/lab5.wl}
+
+\begin{thebibliography}{9}
+\bibitem{rsa} R.\ Rivest, A.\ Shamir, L.\ Adleman, \emph{A Method for Obtaining Digital Signatures
+  and Public-Key Cryptosystems}, Communications of the ACM, 21(2), 1978.
+\bibitem{elg} T.\ ElGamal, \emph{A Public Key Cryptosystem and a Signature Scheme Based on Discrete
+  Logarithms}, IEEE Trans.\ Inf.\ Theory, 31(4), 1985.
+\bibitem{dh} W.\ Diffie, M.\ Hellman, \emph{New Directions in Cryptography}, IEEE Trans.\ Inf.\
+  Theory, 22(6), 1976.
+\bibitem{rfc7919} D.\ Gillmor, \emph{RFC 7919: Negotiated Finite Field Diffie-Hellman Ephemeral
+  Parameters for TLS}, 2016.
+\bibitem{stallings} William Stallings, \emph{Cryptography and Network Security: Principles and
+  Practice}, 7th Edition, Pearson, 2017.
+\end{thebibliography}
+\end{document}
